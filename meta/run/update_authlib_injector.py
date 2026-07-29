@@ -4,8 +4,9 @@ import os
 
 from meta.common import upstream_path, ensure_upstream_dir, default_session
 from meta.common.authlib_injector import BASE_DIR, RELEASES_API_URL, VERSIONS_FILE
-from meta.model.authlib_injector import GitHubReleaseIndex, AuthlibInjectorVersion, AuthlibInjectorIndex, \
-    GitHubReleaseEntry
+from meta.common.github import fetch_releases
+from meta.model.authlib_injector import AuthlibInjectorVersion, AuthlibInjectorIndex
+from meta.model.github import GitHubReleaseAsset, GitHubReleaseEntry
 
 UPSTREAM_DIR = upstream_path()
 
@@ -13,8 +14,9 @@ ensure_upstream_dir(BASE_DIR)
 
 sess = default_session()
 
-def convert_to_authlib_injector(entry: GitHubReleaseEntry, is_recommended: bool) -> AuthlibInjectorVersion:
-    asset = entry.assets[0]
+
+def convert_to_authlib_injector(entry: GitHubReleaseEntry, version: str, asset: GitHubReleaseAsset,
+                                is_recommended: bool) -> AuthlibInjectorVersion:
     download_url = asset.browser_download_url
 
     print(f"Downloading {download_url}")
@@ -22,30 +24,34 @@ def convert_to_authlib_injector(entry: GitHubReleaseEntry, is_recommended: bool)
     r.raise_for_status()
 
     return AuthlibInjectorVersion(
-        version = entry.tag_name.replace("v", ""),
-        published_at = entry.published_at,
-        download_url = download_url,
-        file_size = asset.size,
-        file_sha1 = hashlib.sha1(r.content).hexdigest(),
-        prerelease = entry.prerelease,
+        version=version,
+        published_at=entry.published_at,
+        download_url=download_url,
+        file_size=asset.size,
+        file_sha1=hashlib.sha1(r.content).hexdigest(),
+        prerelease=entry.prerelease,
         recommended=is_recommended
     )
 
 
 def main():
     print("Getting authlib-injector release manifests")
-    r = sess.get(RELEASES_API_URL)
-    r.raise_for_status()
-
-    main_json = r.json()
-    github_index = GitHubReleaseIndex.parse_obj(main_json)
+    releases = fetch_releases(RELEASES_API_URL, sess)
 
     futures = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         has_recommended = False
-        for entry in github_index.__root__:
+        for entry in releases:
+            version = entry.tag_name.removeprefix("v")
+            jar_name = f"authlib-injector-{version}.jar"
+
+            asset = next((a for a in entry.assets if a.name == jar_name), None)
+            if asset is None:
+                print(f"Skipping {entry.tag_name}: no asset named {jar_name}")
+                continue
+
             recommended = (not entry.prerelease and not has_recommended)
-            futures.append(executor.submit(convert_to_authlib_injector, entry, recommended))
+            futures.append(executor.submit(convert_to_authlib_injector, entry, version, asset, recommended))
             if recommended:
                 has_recommended = True
 
