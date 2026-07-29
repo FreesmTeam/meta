@@ -2,7 +2,7 @@ from typing import List
 
 from . import MetaBase
 
-class AuthlibInjectorVersion(MetaBase):
+class LokiVersion(MetaBase):
     version: str
     published_at: str
     download_url: str
@@ -12,5 +12,5 @@ class AuthlibInjectorVersion(MetaBase):
     recommended: bool
 
 
-class AuthlibInjectorIndex(MetaBase):
-    versions: List[AuthlibInjectorVersion]
+class LokiIndex(MetaBase):
+    versions: List[LokiVersion]
