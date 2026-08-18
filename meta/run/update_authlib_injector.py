@@ -59,6 +59,9 @@ def main():
     for future in futures:
         versions.append(future.result())
 
+    if len(versions) == 0:
+        raise Exception("Attempted to write empty versions list", versions, releases)
+
     injector_index = AuthlibInjectorIndex(
         versions=versions,
     )
