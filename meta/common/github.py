@@ -10,7 +10,7 @@ def fetch_releases(api_url: str, sess: requests.Session) -> List[GitHubReleaseEn
     url = api_url
     params = {"per_page": 100}
     while url:
-        r = sess.get(url, params=params)
+        r = sess.get(url, params=params, headers={"Accept": "application/vnd.github+json"})
         r.raise_for_status()
 
         entries += GitHubReleaseIndex.parse_obj(r.json()).__root__
