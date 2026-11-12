@@ -4,8 +4,10 @@ import zipfile
 import hashlib
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
+
+import requests
 
 from meta.common import (
     ensure_component_dir,
@@ -19,6 +21,7 @@ from meta.common.optifine import (
     OPTIFINE_COMPONENT,
     DEFAULT_LAUNCHWRAPPER_VERSION,
     BASE_MULTIMC_MAVEN_URL,
+    BASE_FREESM_GITHUB_MAVEN_URL,
     BASE_OPTIFINE_DOWNLOAD_URL,
     BASE_LAUNCHWRAPPER_DOWNLOAD_URL,
     VERSIONS_FILE,
@@ -38,12 +41,20 @@ LAUNCHER_DIR = launcher_path()
 UPSTREAM_DIR = upstream_path()
 CACHE_DIR = cache_path()
 
+# Some OptiFine and Mojang naming mismatches huh
+MINECRAFT_VERSION_ALIASES = {
+    "1.8.0": "1.8",
+    "1.9.0": "1.9",
+}
+
+
 ensure_component_dir(OPTIFINE_COMPONENT)
 
 sess = default_session()
 
 
 def get_release_time(index: int):
+    # Every OptiFine entry will get a 'releaseTime' one second later than the previous one
     return datetime.fromtimestamp(index, tz=timezone.utc)
 
 
@@ -97,9 +108,20 @@ def download_version(url: str) -> bytes:
     return contents
 
 
-def produce_patch(entry: OptiFineIndexEntry, index: int) -> MetaVersion:
+def produce_patch(entry: OptiFineIndexEntry, index: int) -> Optional[MetaVersion]:
     url = BASE_OPTIFINE_DOWNLOAD_URL % (entry.mcversion, entry.type, entry.patch)
-    contents = download_version(url)
+
+    try:
+        contents = download_version(url)
+    except requests.HTTPError as error:
+        if error.response is not None and error.response.status_code == 404:
+            print(
+                f"Skipping {entry.filename}: This OptiFine .jar file does not exist in BMCLAPI despite BMCLAPI listing it in /versionList/"
+            )
+
+            return None
+        raise
+
     launchwrapper_version = get_launchwrapper_version(contents)
     launchwrapper_version_specifier = (
         # An official one
@@ -117,8 +139,19 @@ def produce_patch(entry: OptiFineIndexEntry, index: int) -> MetaVersion:
         ),
     )
 
-    if launchwrapper_version != DEFAULT_LAUNCHWRAPPER_VERSION:
-        launchwrapper.url = BASE_MULTIMC_MAVEN_URL
+    match launchwrapper_version:
+        # Uses the official launchwrapper
+        case DEFAULT_LAUNCHWRAPPER_VERSION:
+            # No need in specifying any URL
+            pass
+        # MultiMC does not host 'of-2.1' and 'of-2.2' versions for some reason
+        #
+        # 'BASE_FREESM_GITHUB_MAVEN_URL' has both of these,
+        # manually extracted from the latest 1.16 and 1.17 OptiFine builds, respectively
+        case "2.1" | "2.2":
+            launchwrapper.url = BASE_FREESM_GITHUB_MAVEN_URL
+        case _:
+            launchwrapper.url = BASE_MULTIMC_MAVEN_URL
 
     optifine_version = f"{entry.mcversion}_{entry.type}_{entry.patch}"
     optifine = Library(
@@ -140,7 +173,7 @@ def produce_patch(entry: OptiFineIndexEntry, index: int) -> MetaVersion:
         requires=[
             Dependency(
                 uid=MINECRAFT_COMPONENT,
-                equals=entry.mcversion,
+                equals=MINECRAFT_VERSION_ALIASES.get(entry.mcversion, entry.mcversion),
             )
         ],
         main_class="net.minecraft.launchwrapper.Launch",
