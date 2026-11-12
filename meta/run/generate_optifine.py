@@ -97,14 +97,6 @@ def download_version(url: str) -> bytes:
     return contents
 
 
-def get_optifine_launchwrapper(version: str) -> bytes:
-    url = BASE_LAUNCHWRAPPER_DOWNLOAD_URL % (version, version)
-    r = sess.get(url)
-    r.raise_for_status()
-
-    return r.content
-
-
 def produce_patch(entry: OptiFineIndexEntry, index: int) -> MetaVersion:
     url = BASE_OPTIFINE_DOWNLOAD_URL % (entry.mcversion, entry.type, entry.patch)
     contents = download_version(url)
@@ -152,14 +144,20 @@ def produce_patch(entry: OptiFineIndexEntry, index: int) -> MetaVersion:
             )
         ],
         main_class="net.minecraft.launchwrapper.Launch",
-        additional_tweakers="optifine.OptiFineTweaker",
+        additional_tweakers=["optifine.OptiFineTweaker"],
         libraries=[launchwrapper, optifine],
     )
 
 
 def process_versions(index: OptiFineIndex) -> List[MetaVersion]:
     all_versions: List[MetaVersion] = []
-    for index, entry in enumerate(index.__root__):
+    # The order in which BMCLAPI returns its version list is from latest to oldest,
+    # which means we would be iterating from latest to oldest, assigning earliest timestamps
+    # to the latest and latest timestamps to the oldest entries of that version list.
+    #
+    # But, we would like to have the highest 'releaseTime' in latest iterations so that the sort algorithm below
+    # will place latest versions the first, hence, we reverse the BMCLAPI version list (now we iterate from oldest)
+    for index, entry in enumerate(reversed(index.__root__)):
         patch = produce_patch(entry, index)
 
         if patch is not None:
@@ -175,12 +173,12 @@ def main():
 
     all_versions = process_versions(index)
 
-    for version in all_versions:
-        version.write(
+    for entry in all_versions:
+        entry.write(
             os.path.join(
                 LAUNCHER_DIR,
                 OPTIFINE_COMPONENT,
-                f"{version.mcversion}_{version.type}_{version.patch}.json",
+                f"{entry.version}.json",
             )
         )
 
