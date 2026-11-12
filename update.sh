@@ -45,6 +45,7 @@ python -m meta.run.update_java || fail_in
 python -m meta.run.update_authlib_injector || fail_in
 python -m meta.run.update_loki || fail_in
 python -m meta.run.update_ely_authlib || fail_in
+python -m meta.run.update_optifine || fail_in
 
 if [ "${DEPLOY_TO_GIT}" = true ]; then
     upstream_git add mojang/version_manifest_v2.json mojang/java_all.json mojang/versions/* || fail_in
@@ -57,6 +58,7 @@ if [ "${DEPLOY_TO_GIT}" = true ]; then
     upstream_git add authlib_injector/*.json || fail_in
     upstream_git add loki/*.json || fail_in
     upstream_git add ely_authlib/*.json || fail_in
+    upstream_git add optifine/*.json || fail_in
     if ! upstream_git diff --cached --exit-code; then
         upstream_git commit -a -m "Update ${currentDate}" || fail_in
         upstream_git push || exit 1
@@ -76,6 +78,7 @@ python -m meta.run.generate_java || fail_out
 python -m meta.run.generate_authlib_injector || fail_out
 python -m meta.run.generate_loki || fail_out
 python -m meta.run.generate_ely_authlib || fail_out
+python -m meta.run.generate_optifine || fail_out
 python -m meta.run.index || fail_out
 
 if [ "${DEPLOY_TO_GIT}" = true ]; then
@@ -89,6 +92,7 @@ if [ "${DEPLOY_TO_GIT}" = true ]; then
     launcher_git add moe.yushi.authlibinjector/* || fail_out
     launcher_git add org.unmojang.loki/* || fail_out
     launcher_git add by.ely.authlib/* || fail_out
+    launcher_git add net.optifine/* || fail_out
 
     if ! launcher_git diff --cached --exit-code; then
         launcher_git commit -a -m "Update ${currentDate}" || fail_out
