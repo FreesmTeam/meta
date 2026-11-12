@@ -141,7 +141,7 @@ def produce_patch(entry: OptiFineIndexEntry, index: int) -> Optional[MetaVersion
 
     match launchwrapper_version:
         # Uses the official launchwrapper
-        case DEFAULT_LAUNCHWRAPPER_VERSION:
+        case some_value if some_value == DEFAULT_LAUNCHWRAPPER_VERSION:
             # No need in specifying any URL
             pass
         # MultiMC does not host 'of-2.1' and 'of-2.2' versions for some reason
