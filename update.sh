@@ -43,6 +43,9 @@ python -m meta.run.update_quilt || fail_in
 python -m meta.run.update_liteloader || fail_in
 python -m meta.run.update_cleanroom || fail_in
 python -m meta.run.update_java || fail_in
+python -m meta.run.update_authlib_injector || fail_in
+python -m meta.run.update_loki || fail_in
+python -m meta.run.update_ely_authlib || fail_in
 
 if [ "${DEPLOY_TO_GIT}" = true ]; then
     upstream_git add mojang/version_manifest_v2.json mojang/java_all.json mojang/versions/* || fail_in
@@ -53,6 +56,9 @@ if [ "${DEPLOY_TO_GIT}" = true ]; then
     upstream_git add liteloader/*.json || fail_in
     upstream_git add cleanroom/*.json || fail_in
     upstream_git add java_runtime/adoptium/available_releases.json java_runtime/adoptium/versions/*.json java_runtime/azul/packages.json java_runtime/azul/versions/*.json java_runtime/ibm/available_releases.json java_runtime/ibm/versions/*.json || fail_in
+    upstream_git add authlib_injector/*.json || fail_in
+    upstream_git add loki/*.json || fail_in
+    upstream_git add ely_authlib/*.json || fail_in
     if ! upstream_git diff --cached --exit-code; then
         upstream_git commit -a -m "Update ${currentDate}" || fail_in
         upstream_git push || exit 1
@@ -70,6 +76,9 @@ python -m meta.run.generate_quilt || fail_out
 python -m meta.run.generate_liteloader || fail_out
 python -m meta.run.generate_cleanroom || fail_out
 python -m meta.run.generate_java || fail_out
+python -m meta.run.generate_authlib_injector || fail_out
+python -m meta.run.generate_loki || fail_out
+python -m meta.run.generate_ely_authlib || fail_out
 python -m meta.run.index || fail_out
 
 if [ "${DEPLOY_TO_GIT}" = true ]; then
@@ -81,6 +90,9 @@ if [ "${DEPLOY_TO_GIT}" = true ]; then
     launcher_git add com.mumfrey.liteloader/* || fail_out
     launcher_git add com.cleanroommc.cleanroom/* || fail_out
     launcher_git add net.minecraft.java/* net.adoptium.java/* com.azul.java/* com.ibm.java/* || fail_out
+    launcher_git add moe.yushi.authlibinjector/* || fail_out
+    launcher_git add org.unmojang.loki/* || fail_out
+    launcher_git add by.ely.authlib/* || fail_out
 
     if ! launcher_git diff --cached --exit-code; then
         launcher_git commit -a -m "Update ${currentDate}" || fail_out
@@ -90,7 +102,7 @@ fi
 
 if [ "${DEPLOY_TO_FOLDER}" = true ]; then
     echo "Deploying to ${DEPLOY_FOLDER}"
-    rsync -rvog --chown="${DEPLOY_FOLDER_USER}:${DEPLOY_FOLDER_GROUP}" --exclude=.git "${META_LAUNCHER_DIR}/" "${DEPLOY_FOLDER}"
+    rsync -rvog --chown="${DEPLOY_FOLDER_USER}:${DEPLOY_FOLDER_GROUP}" --exclude=.git --exclude=.github "${META_LAUNCHER_DIR}/" "${DEPLOY_FOLDER}"
 fi
 
 exit 0

@@ -27,7 +27,9 @@ from meta.model import (
     MojangArtifact,
     Dependency,
     MetaPackage,
+    MojangRule,
     MojangRules,
+    OSRule,
 )
 from meta.model.mojang import (
     LegacyServices,
@@ -91,7 +93,9 @@ LOG4J_HASHES = {
 # We want versions that contain natives for all platforms. If there are multiple, pick the latest one
 # LWJGL versions we want
 PASS_VARIANTS = [
-    "472ee33f7a1294822aa2d617cd6ccdfd92f949a0",  # 3.4.1 (2026-04-07 11:52:43+00:00) vulkan
+    "40ee0dc8739c4539b51df3a92386941bd1d9d911",  # 3.4.3 (2026-09-01 11:29:01+00:00)
+    "fd17e8d3473d57ff4141a36cbfcfabade5fbb7c5",  # 3.4.2 (2026-07-21 11:45:42+00:00)
+    "317adbdf3b02845f7240549bb4aaa5fcd1344c49",  # 3.4.1 (2026-07-16 13:59:30+00:00) SDL
     "2b00f31688148fc95dbc8c8ef37308942cf0dce0",  # 3.3.6 (2025-10-21 11:38:51+00:00)
     "73974b3af2afeb5b272ffbadcd7963014387c84f",  # 3.3.3 (2024-05-22 16:25:41+00:00)
     "765b4ab443051d286bdbb1c19cd7dc86b0792dce",  # 3.3.2 (2024-01-17 13:19:20+00:00)
@@ -109,6 +113,11 @@ PASS_VARIANTS = [
 
 # LWJGL versions we def. don't want!
 BAD_VARIANTS = [
+    "02a9f886ad37d391d2b34a08800e8bd852b92059",  # 3.4.3 (2026-09-08 13:04:44+00:00) no lwjgl-spng
+    "b510ab8669cd8b031298f171aa810c7d3e7acb8f",  # 3.4.3 (2026-08-25 12:53:43+00:00) no lwjgl-spng
+    "17754e4d1045947c3b99d22b9db7e75bfb6d252a",  # 3.4.2 (2026-08-17 11:46:16+00:00) removed tinyfd
+    "0ab5c885c21dfd8133277e8f557839f5fab35311",  # 3.4.1 (2026-05-26 13:48:31+00:00) no SDL
+    "472ee33f7a1294822aa2d617cd6ccdfd92f949a0",  # 3.4.1 (2026-04-07 11:52:43+00:00) vulkan, has significant performance regressions
     "1fd0e4d1f0f7c97e8765a69d38225e1f27ee14ef",  # 3.4.1 (2026-02-17 12:42:24+00:00) before vulkan
     "6f32ef730d05562ede7db0b845b72ea16dd239d5",  # 3.3.3 (2024-05-29 12:04:43+00:00) missing os rule for freetype natives-macos-patch
     "8a9b08f11271eb4de3b50e5d069949500b2c7bc1",  # 3.3.3 (2024-04-03 11:49:39+00:00) seems to have a broken libfreetype for macOS x86_64
@@ -219,6 +228,22 @@ def adapt_new_style_arguments_to_traits(arguments):
     return foo
 
 
+def adapt_new_style_jvm_arguments(arguments):
+    PREFIXES = ["-XX:StackShadowPages="]
+
+    result = []
+    for arg in arguments.jvm:
+        if not isinstance(arg, str):
+            continue
+        
+        if not any(arg.startswith(x) for x in PREFIXES):
+            continue
+
+        result.append(arg)
+
+    return result
+
+
 def is_macos_only(rules: Optional[MojangRules]):
     allows_osx = False
     allows_all = False
@@ -232,6 +257,81 @@ def is_macos_only(rules: Optional[MojangRules]):
         if allows_osx and not allows_all:
             return True
     return False
+
+
+# Mojang gates architecture specific natives *only* behind the generic OS rule (for
+# example the "natives-macos-arm64" classifier is only allowed when the OS is "osx").
+ARCH_NATIVE_OS = {
+    "macos-arm64": "osx-arm64",
+    "macos-aarch64": "osx-arm64",
+    "windows-arm64": "windows-arm64",
+    "windows-aarch64": "windows-arm64",
+    "linux-arm64": "linux-arm64",
+    "linux-aarch64": "linux-arm64",
+    "linux-arm32": "linux-arm32",
+    "linux-aarch32": "linux-arm32",
+    "linux-riscv64": "linux-riscv64",
+}
+
+GENERIC_OS = {
+    "osx-arm64": "osx",
+    "windows-arm64": "windows",
+    "linux-arm64": "linux",
+    "linux-arm32": "linux",
+    "linux-riscv64": "linux",
+}
+
+
+def remove_allow_rule(lib: Library, os_name: str) -> None:
+    if not lib.rules:
+        return
+    lib.rules.__root__ = [
+        rule
+        for rule in lib.rules
+        if not (
+            rule.action == "allow" and rule.os is not None and rule.os.name == os_name
+        )
+    ]
+
+
+def allow_arch_native(lib: Library) -> None:
+    if not lib.name:
+        return
+
+    candidates = [lib.name.artifact]
+    if lib.name.classifier:
+        candidates.append(lib.name.classifier)
+    native_name = "-".join(candidates)
+
+    allowed: List[Optional[str]] = []
+    disallowed: List[str] = []
+    if lib.rules:
+        for rule in lib.rules:
+            if rule.action == "allow" and rule.os is None:
+                return
+            if rule.os is None:
+                continue
+            if rule.action == "allow":
+                allowed.append(rule.os.name)
+            else:
+                disallowed.append(rule.os.name)
+
+    for native, os_name in ARCH_NATIVE_OS.items():
+        if native not in native_name:
+            continue
+        generic = GENERIC_OS[os_name]
+        if os_name in disallowed or generic not in allowed:
+            continue
+
+        # Restrict the native to its architecture to not make people on intel macs download both architectures
+        remove_allow_rule(lib, generic)
+
+        if os_name not in allowed:
+            rule = MojangRule(action="allow", os=OSRule(name=os_name))
+            if lib.rules is None:
+                lib.rules = MojangRules(__root__=[rule])
+            else:
+                lib.rules.__root__.append(rule)
 
 
 def patch_library(lib: Library, patches: LibraryPatches) -> List[Library]:
@@ -251,6 +351,8 @@ def patch_library(lib: Library, patches: LibraryPatches) -> List[Library]:
                     new_libraries += list(dict.fromkeys(additional_copy))
                     if patch.patchAdditionalLibraries:
                         to_patch += additional_copy
+
+        allow_arch_native(target)
 
     return new_libraries
 
@@ -505,6 +607,9 @@ def main():
             v.additional_traits.extend(
                 adapt_new_style_arguments_to_traits(mojang_version.arguments)
             )
+            if not v.additional_jvm_args:
+                v.additional_jvm_args = []
+            v.additional_jvm_args.extend(adapt_new_style_jvm_arguments(mojang_version.arguments))
         out_filename = os.path.join(
             LAUNCHER_DIR, MINECRAFT_COMPONENT, f"{v.version}.json"
         )

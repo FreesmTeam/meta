@@ -43,6 +43,7 @@ def version_from_build_system_installer(
     version: NeoForgeVersion,
 ) -> MetaVersion:
     v = MetaVersion(name="NeoForge", version=version.rawVersion, uid=NEOFORGE_COMPONENT)
+    v.type = "beta" if version.rawVersion.endswith("-beta") else "release"
     v.main_class = "io.github.zekerzhayard.forgewrapper.installer.Main"
 
     # FIXME: Add the size and hash here
@@ -133,9 +134,9 @@ def main():
         )
 
         eprint(installer_version_filepath)
-        assert os.path.isfile(
-            installer_version_filepath
-        ), f"version {installer_version_filepath} does not have installer version manifest"
+        if not os.path.isfile(installer_version_filepath):
+            eprint(f"Skipped version {installer_version_filepath} as it does not have an installer version manifest")
+            continue
         installer = MojangVersion.parse_file(installer_version_filepath)
         profile = NeoForgeInstallerProfileV2.parse_file(profile_filepath)
         v = version_from_build_system_installer(installer, profile, version)
