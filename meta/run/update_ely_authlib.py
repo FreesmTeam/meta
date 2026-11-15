@@ -63,6 +63,9 @@ def main():
 
     versions.sort(key=lambda v: Version(v.target_version), reverse=True)
 
+    for v in versions:
+        v.download_url = v.download_url.replace("https://repo.llaun.ch", "https://dl.freesmlauncher.org/ely", 1)
+
     last_updated = root.find("versioning").find("lastUpdated").text
     authlib_index = ElyAuthlibIndex(
         versions=versions,
