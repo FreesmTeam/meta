@@ -41,6 +41,7 @@ python -m meta.run.update_neoforge || fail_in
 python -m meta.run.update_fabric || fail_in
 python -m meta.run.update_quilt || fail_in
 python -m meta.run.update_liteloader || fail_in
+python -m meta.run.update_cleanroom || fail_in
 python -m meta.run.update_java || fail_in
 python -m meta.run.update_authlib_injector || fail_in
 python -m meta.run.update_loki || fail_in
@@ -53,6 +54,7 @@ if [ "${DEPLOY_TO_GIT}" = true ]; then
     upstream_git add fabric/loader-installer-json/*.json fabric/meta-v2/*.json fabric/jars/*.json || fail_in
     upstream_git add quilt/loader-installer-json/*.json quilt/meta-v3/*.json quilt/jars/*.json || fail_in
     upstream_git add liteloader/*.json || fail_in
+    upstream_git add cleanroom/*.json || fail_in
     upstream_git add java_runtime/adoptium/available_releases.json java_runtime/adoptium/versions/*.json java_runtime/azul/packages.json java_runtime/azul/versions/*.json java_runtime/ibm/available_releases.json java_runtime/ibm/versions/*.json || fail_in
     upstream_git add authlib_injector/*.json || fail_in
     upstream_git add loki/*.json || fail_in
@@ -72,6 +74,7 @@ python -m meta.run.generate_neoforge || fail_out
 python -m meta.run.generate_fabric || fail_out
 python -m meta.run.generate_quilt || fail_out
 python -m meta.run.generate_liteloader || fail_out
+python -m meta.run.generate_cleanroom || fail_out
 python -m meta.run.generate_java || fail_out
 python -m meta.run.generate_authlib_injector || fail_out
 python -m meta.run.generate_loki || fail_out
@@ -85,6 +88,7 @@ if [ "${DEPLOY_TO_GIT}" = true ]; then
     launcher_git add net.fabricmc.fabric-loader/* net.fabricmc.intermediary/* || fail_out
     launcher_git add org.quiltmc.quilt-loader/* || fail_out # TODO: add Quilt hashed, once it is actually used
     launcher_git add com.mumfrey.liteloader/* || fail_out
+    launcher_git add com.cleanroommc.cleanroom/* || fail_out
     launcher_git add net.minecraft.java/* net.adoptium.java/* com.azul.java/* com.ibm.java/* || fail_out
     launcher_git add moe.yushi.authlibinjector/* || fail_out
     launcher_git add org.unmojang.loki/* || fail_out
