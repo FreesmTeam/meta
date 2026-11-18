@@ -1,5 +1,0 @@
-BASE_DIR = "cleanroom"
-VERSIONS_FILE = "cleanroom/versions.json"
-COMPONENT = "com.cleanroommc.cleanroom"
-GITHUB_REPO = "CleanroomMC/Cleanroom"
-MINECRAFT_VERSION = "1.12.2"
